@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Antike Quiz</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; font-family: Georgia, 'Times New Roman', serif; background: #0a0810; color: #f0e8c8; overflow: hidden; }
+
+#bg {
+  position: fixed; inset: 0; z-index: 0;
+  background-size: cover; background-position: center top;
+  filter: brightness(0.42) saturate(0.75);
+}
+
+#canvas-bg { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+
+#app {
+  position: fixed; inset: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  overflow-y: auto; padding: 2rem 1rem;
+}
+
+.card {
+  background: rgba(8, 4, 18, 0.85);
+  border: 1.5px solid rgba(212,175,55,0.55);
+  border-radius: 16px; padding: 2.4rem 2.6rem;
+  width: 100%; max-width: 660px;
+  box-shadow: 0 0 60px rgba(212,175,55,0.1), inset 0 0 40px rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.6s ease;
+}
+@keyframes fadeIn { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:none} }
+
+.ornament { text-align:center; color:rgba(212,175,55,0.6); font-size:1.1rem; letter-spacing:6px; margin-bottom:0.5rem; }
+h1 { font-size:2.1rem; text-align:center; color:#d4af37; text-shadow:0 0 20px rgba(212,175,55,0.4); margin-bottom:0.4rem; letter-spacing:2px; }
+h2 { font-size:1.05rem; text-align:center; color:rgba(240,232,200,0.7); font-weight:normal; font-style:italic; margin-bottom:1.6rem; }
+.divider { border:none; border-top:1px solid rgba(212,175,55,0.25); margin:1.2rem 0; }
+.start-desc { font-size:0.92rem; color:rgba(240,232,200,0.6); text-align:center; line-height:1.7; margin-bottom:1.8rem; font-style:italic; }
+
+.progress-bar-wrap { background:rgba(255,255,255,0.08); border-radius:99px; height:6px; margin-bottom:1.3rem; overflow:hidden; }
+.progress-bar-fill { height:100%; background:linear-gradient(90deg,#8b6914,#d4af37); border-radius:99px; transition:width 0.5s ease; }
+.q-counter { text-align:right; font-size:0.78rem; color:rgba(212,175,55,0.6); margin-bottom:0.3rem; letter-spacing:1px; }
+.score-badge { text-align:center; margin-bottom:1.3rem; font-size:0.85rem; color:rgba(212,175,55,0.7); letter-spacing:1px; }
+.score-badge span { color:#d4af37; font-size:1.1rem; }
+.question-text { font-size:1.04rem; line-height:1.65; color:#f0e8c8; margin-bottom:1.4rem; border-left:3px solid rgba(212,175,55,0.5); padding-left:1rem; }
+
+.answers { display:grid; grid-template-columns:1fr 1fr; gap:0.65rem; margin-bottom:1rem; }
+.ans-btn { background:rgba(25,15,45,0.75); border:1px solid rgba(212,175,55,0.3); border-radius:10px; padding:0.78rem 0.9rem; color:#f0e8c8; font-size:0.88rem; font-family:Georgia,serif; cursor:pointer; text-align:left; transition:all 0.22s; line-height:1.4; }
+.ans-btn:hover:not(:disabled) { background:rgba(212,175,55,0.13); border-color:rgba(212,175,55,0.7); box-shadow:0 0 14px rgba(212,175,55,0.18); transform:translateY(-1px); }
+.ans-btn.correct { background:rgba(30,90,50,0.75); border-color:#4caf50; color:#b8f5c0; }
+.ans-btn.wrong   { background:rgba(100,20,20,0.75); border-color:#e55; color:#ffc0c0; }
+.ans-btn:disabled { cursor:default; transform:none; }
+
+.feedback { text-align:center; font-size:0.93rem; min-height:1.4rem; margin-bottom:0.7rem; }
+.feedback.ok  { color:#7de88a; }
+.feedback.err { color:#ff8888; }
+
+.main-btn { display:block; width:100%; background:rgba(212,175,55,0.12); border:1.5px solid rgba(212,175,55,0.6); border-radius:10px; padding:0.85rem 1.5rem; color:#d4af37; font-family:Georgia,serif; font-size:1rem; cursor:pointer; letter-spacing:1.5px; transition:all 0.25s; text-transform:uppercase; }
+.main-btn:hover { background:rgba(212,175,55,0.22); box-shadow:0 0 22px rgba(212,175,55,0.3); transform:translateY(-1px); }
+.main-btn:active { transform:scale(0.98); }
+
+/* Lückentext */
+.gap-text { font-size:0.95rem; line-height:2.9; color:#f0e8c8; margin-bottom:1.2rem; }
+.gap-drop { display:inline-block; vertical-align:middle; min-width:108px; height:30px; border-bottom:1.5px solid rgba(212,175,55,0.5); background:rgba(212,175,55,0.07); border-radius:6px; margin:0 4px; text-align:center; line-height:28px; font-size:0.86rem; color:#d4af37; font-family:Georgia,serif; cursor:pointer; transition:background 0.2s,border-color 0.2s; }
+.gap-drop.drag-over { background:rgba(212,175,55,0.22); border-color:#d4af37; }
+.gap-drop.filled    { border-color:rgba(212,175,55,0.4); }
+.gap-drop.correct-gap { border-color:#4caf50; background:rgba(30,90,50,0.35); color:#7de88a; }
+.gap-drop.wrong-gap   { border-color:#e55; background:rgba(100,20,20,0.35); color:#ff8888; }
+
+.tiles-pool { display:flex; flex-wrap:wrap; gap:0.45rem; margin-bottom:1.1rem; padding:0.75rem; background:rgba(0,0,0,0.28); border:1px solid rgba(212,175,55,0.2); border-radius:10px; min-height:48px; }
+.tile { background:rgba(212,175,55,0.13); border:1px solid rgba(212,175,55,0.45); border-radius:8px; padding:4px 12px; font-family:Georgia,serif; font-size:0.86rem; color:#f0e8c8; cursor:grab; user-select:none; transition:background 0.18s,transform 0.12s; }
+.tile:hover { background:rgba(212,175,55,0.26); transform:translateY(-1px); }
+.tile.dragging { opacity:0.4; }
+.tile.used { opacity:0.25; pointer-events:none; }
+
+/* Ergebnis */
+#dancer-wrap { display:flex; justify-content:center; margin-bottom:0.5rem; }
+.result-score { text-align:center; font-size:2.1rem; color:#d4af37; margin-bottom:0.4rem; }
+.result-msg   { text-align:center; font-size:1rem; color:rgba(240,232,200,0.75); font-style:italic; margin-bottom:1.8rem; }
+
+#fireworks-canvas { position:fixed; inset:0; z-index:9; pointer-events:none; }
+#parade-canvas { position:fixed; inset:0; z-index:8; pointer-events:none; }
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+<canvas id="canvas-bg"></canvas>
+
+<div id="app">
+  <!-- START -->
+  <div class="card" id="screen-start">
+    <div class="ornament">⸻ ✦ ⸻</div>
+    <h1>Antike Quiz</h1>
+    <h2>Griechisch-Römische Mythologie</h2>
+    <hr class="divider">
+    <p class="start-desc">Teste dein Wissen über Götter, Helden und Epochen der Antike.<br>15 Fragen – gefolgt von einem Lückentext.</p>
+    <button class="main-btn" onclick="startQuiz()">▶ &nbsp;Spiel beginnen</button>
+  </div>
+
+  <!-- QUIZ -->
+  <div class="card" id="screen-quiz" style="display:none;">
+    <div class="q-counter" id="q-counter">Frage 1 / 15</div>
+    <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    <div class="score-badge">Punkte: <span id="score-display">0</span></div>
+    <div class="question-text" id="q-text"></div>
+    <div class="answers" id="answers-grid"></div>
+    <div class="feedback" id="feedback"></div>
+    <button class="main-btn" id="next-btn" style="display:none;" onclick="nextQuestion()">Weiter →</button>
+  </div>
+
+  <!-- LÜCKENTEXT -->
+  <div class="card" id="screen-gap" style="display:none;">
+    <div class="ornament">⸻ ✦ ⸻</div>
+    <h1 style="font-size:1.5rem;">Lückentext</h1>
+    <h2>Schiebe die Bausteine in die richtigen Lücken</h2>
+    <hr class="divider">
+    <div class="tiles-pool" id="tiles-pool"></div>
+    <div class="gap-text" id="gap-text-container"></div>
+    <div class="feedback" id="gap-feedback"></div>
+    <button class="main-btn" onclick="checkGap()">Auswerten</button>
+  </div>
+
+  <!-- ERGEBNIS -->
+  <div class="card" id="screen-result" style="display:none;">
+    <div class="ornament">⸻ ✦ ⸻</div>
+    <h1 style="font-size:1.5rem;">Ergebnis</h1>
+    <hr class="divider">
+    <div id="dancer-wrap">
+      <canvas id="dancer-canvas" width="120" height="160" style="display:block;margin:0 auto;"></canvas>
+    </div>
+    <div class="result-score" id="result-score"></div>
+    <div class="result-msg"   id="result-msg"></div>
+    <button class="main-btn" onclick="restartGame()">↺ &nbsp;Nochmal spielen</button>
+  </div>
+</div>
+
+<canvas id="fireworks-canvas"></canvas>
+<canvas id="parade-canvas"></canvas>
+
+<script>
+// ── SOUND SYSTEM (Web Audio API) ──────────────────
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, type, duration, volume=0.4, startTime=0, fadeOut=true) {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ctx.currentTime + startTime);
+  gain.gain.setValueAtTime(volume, ctx.currentTime + startTime);
+  if (fadeOut) gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+  osc.start(ctx.currentTime + startTime);
+  osc.stop(ctx.currentTime + startTime + duration);
+}
+
+function playNoise(duration, volume=0.15, startTime=0) {
+  const ctx = getAudioCtx();
+  const bufferSize = ctx.sampleRate * duration;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const gain = ctx.createGain();
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.frequency.value = 800;
+  source.connect(filter); filter.connect(gain); gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(volume, ctx.currentTime + startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTime + duration);
+  source.start(ctx.currentTime + startTime);
+  source.stop(ctx.currentTime + startTime + duration);
+}
+
+// Richtiger Antwort: heller Fanfaren-Akkord
+function soundCorrect() {
+  playTone(523, 'sine', 0.18, 0.35, 0.0);   // C5
+  playTone(659, 'sine', 0.18, 0.30, 0.05);  // E5
+  playTone(784, 'sine', 0.30, 0.40, 0.10);  // G5
+  playTone(1047,'sine', 0.40, 0.30, 0.20);  // C6
+  playTone(659, 'triangle', 0.1, 0.15, 0.0);
+}
+
+// Falsche Antwort: dumpfer Misston
+function soundWrong() {
+  playTone(200, 'sawtooth', 0.12, 0.3, 0.0);
+  playTone(150, 'sawtooth', 0.25, 0.3, 0.10);
+  playTone(120, 'square',   0.35, 0.2, 0.18);
+  playNoise(0.25, 0.08, 0.0);
+}
+
+// Gong beim Start
+function soundGong() {
+  const ctx = getAudioCtx();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(180, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(90, ctx.currentTime + 1.5);
+  gain.gain.setValueAtTime(0.5, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 2.0);
+  osc.start(ctx.currentTime);
+  osc.stop(ctx.currentTime + 2.0);
+  // Oberton
+  playTone(360, 'sine', 1.2, 0.15, 0.0);
+  playTone(540, 'sine', 0.6, 0.08, 0.0);
+  playNoise(0.08, 0.25, 0.0);
+}
+
+// Feuerwerk: Knall + Rauschen
+function soundFirework() {
+  playNoise(0.06, 0.5, 0.0);
+  playNoise(0.4,  0.2, 0.06);
+  playTone(120, 'sine', 0.08, 0.3, 0.0);
+}
+
+// Siegesmelodie am Ende (episch)
+function soundVictory() {
+  const melody = [
+    [523,0.0],[659,0.18],[784,0.36],[1047,0.54],
+    [784,0.72],[880,0.90],[1047,1.08],[1175,1.3]
+  ];
+  melody.forEach(([f,t]) => playTone(f,'sine',0.22,0.35,t));
+  // Bass
+  [130,164,196,261].forEach((f,i) => playTone(f,'triangle',0.35,0.2,i*0.36));
+}
+
+// Lückentext: sanftes Plopp beim Einsetzen
+function soundDrop() {
+  playTone(440, 'sine', 0.08, 0.2, 0.0);
+  playTone(660, 'sine', 0.06, 0.15, 0.05);
+}
+
+// Funken-Zischen
+function soundSparks() {
+  playNoise(0.15, 0.12, 0.0);
+  playTone(1200, 'sine', 0.08, 0.08, 0.0);
+}
+
+// ── Hintergrundbild setzen ────────────────────────
+document.getElementById('bg').style.backgroundImage = "url('https://i.ibb.co/JWG43WrN/Bild.jpg')";
+
+// ── Quiz-Daten ────────────────────────────────────
+const quizData = [
+  {q:"Welcher griechische Philosoph gründete die Akademie in Athen um 387 v. Chr.?",opts:["Aristoteles","Sokrates","Heraklit","Platon"],ans:3},
+  {q:"Welcher römische Gott der Unterwelt entspricht dem griechischen Hades?",opts:["Neptun","Vulcanus","Pluto","Saturn"],ans:2},
+  {q:"Welcher Titan brachte den Menschen das Feuer und wurde am Kaukasus bestraft?",opts:["Atlas","Epimetheus","Iapetos","Prometheus"],ans:3},
+  {q:"Welcher Held enthauptete Medusa mit Athenas Hilfe und rettete Andromeda?",opts:["Bellerophon","Perseus","Kadmos","Orpheus"],ans:1},
+  {q:"Die wievielte der zwölf Arbeiten des Herakles war die Reinigung der Augiasställe?",opts:["Fünfte","Achte","Zweite","Elfte"],ans:0},
+  {q:"Wer führte die Argonauten zur Eroberung des Goldenen Vlieses nach Kolchis?",opts:["Herakles","Theseus","Orpheus","Jason"],ans:3},
+  {q:"In welchem Epos Homers beschreibt Odysseus seine Nekyia (Unterweltsfahrt)?",opts:["Ilias","Argonautika","Theogonie","Odyssee"],ans:3},
+  {q:"Wann fanden die Perserkriege statt, beginnend mit der Schlacht bei Marathon?",opts:["500–450 v. Chr.","490–479 v. Chr.","480–450 v. Chr.","499–449 v. Chr."],ans:1},
+  {q:"Welcher römische Kaiser ließ das Kolosseum 80 n. Chr. einweihen?",opts:["Vespasian","Domitian","Nero","Titus"],ans:3},
+  {q:"Welcher römische Diktator überquerte 49 v. Chr. den Rubikon?",opts:["Pompeius","Crassus","Julius Caesar","Sulla"],ans:2},
+  {q:"In welchem Jahr plünderte Alarich als erster Feind seit 800 Jahren die Stadt Rom?",opts:["455 n. Chr.","410 n. Chr.","378 n. Chr.","476 n. Chr."],ans:1},
+  {q:"Welcher römische Kaiser verfolgte Christen ab 64 n. Chr. nach dem großen Stadtbrand?",opts:["Caligula","Claudius","Nero","Trajan"],ans:2},
+  {q:"Gegen wen kämpften die Römer in den Punischen Kriegen (endend 146 v. Chr.)?",opts:["Makedonien","Gallien","Parther","Karthago"],ans:3},
+  {q:"Wann endete das Orakel von Delphi offiziell als heidnisches Heiligtum?",opts:["393 n. Chr.","529 n. Chr.","390 n. Chr.","476 n. Chr."],ans:0},
+  {q:"In welchem Epos kämpft Achilles im Trojanischen Krieg um die entführte Helena?",opts:["Odyssee","Ilias","Aeneis","Argonautika"],ans:1}
+];
+
+const gapAnswers = ["Mythologie","Zeus","Poseidon","Hades","Neptun","Pluto","Herakles","Augiasställe","Ilias","Helena","Perserkriege","Punischen","476"];
+const gapTemplate = `Die griechisch-römische Antike umfasst die Zeit von etwa 800 v. Chr. bis 500 n. Chr. Im Zentrum der griechischen %%0%% stand der Olymp mit zwölf Hauptgöttern, angeführt von %%1%%, dem Vater der Götter. Sein Bruder %%2%% herrschte über das Meer, %%3%% über die Unterwelt. Die Römer übernahmen diese Götter und nannten Zeus Jupiter, Poseidon %%4%% und Hades %%5%%. Berühmte Helden wie %%6%% vollbrachten zwölf Arbeiten, darunter die Reinigung der %%7%%. Im Trojanischen Krieg, beschrieben in Homers %%8%%, kämpfte Achill um %%9%%. Wichtige Ereignisse waren die %%10%% gegen Persien (490–479 v. Chr.) und die %%11%% Kriege Roms gegen Karthago. Die Antike endete mit dem Fall Roms im Jahr %%12%% n. Chr.`;
+
+let currentQ = 0, score = 0, answered = false;
+
+function showScreen(id) {
+  ['screen-start','screen-quiz','screen-gap','screen-result'].forEach(s => document.getElementById(s).style.display='none');
+  const el = document.getElementById(id);
+  el.style.display = 'block';
+  el.style.animation = 'none'; void el.offsetWidth; el.style.animation = 'fadeIn 0.6s ease';
+}
+
+function startQuiz() { soundGong(); currentQ=0; score=0; showScreen('screen-quiz'); renderQuestion(); startParade(); }
+
+function renderQuestion() {
+  answered = false;
+  const d = quizData[currentQ];
+  document.getElementById('q-counter').textContent = `Frage ${currentQ+1} / ${quizData.length}`;
+  document.getElementById('progress-fill').style.width = ((currentQ/quizData.length)*100)+'%';
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('q-text').textContent = d.q;
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('next-btn').style.display = 'none';
+  const grid = document.getElementById('answers-grid');
+  grid.innerHTML = '';
+  d.opts.forEach((opt,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'ans-btn';
+    btn.textContent = ['a) ','b) ','c) ','d) '][i]+opt;
+    btn.onclick = () => selectAnswer(i,btn);
+    grid.appendChild(btn);
+  });
+}
+
+function selectAnswer(idx,btn) {
+  if (answered) return; answered = true;
+  const correct = quizData[currentQ].ans;
+  const fb = document.getElementById('feedback');
+  document.querySelectorAll('.ans-btn').forEach((b,i) => { b.disabled=true; if(i===correct) b.classList.add('correct'); });
+  if (idx===correct) { score++; fb.textContent='✓ Richtig! Gut gemacht.'; fb.className='feedback ok'; soundCorrect(); spawnSparks(); }
+  else { btn.classList.add('wrong'); fb.textContent='✗ Leider falsch. Die richtige Antwort ist markiert.'; fb.className='feedback err'; soundWrong(); }
+  document.getElementById('score-display').textContent = score;
+  document.getElementById('next-btn').style.display = 'block';
+}
+
+function nextQuestion() {
+  currentQ++;
+  if (currentQ < quizData.length) {
+    renderQuestion();
+  } else {
+    showGapText();
+  }
+}
+
+// ── Lückentext ────────────────────────────────────
+function showGapText() {
+  showScreen('screen-gap');
+  const pool = document.getElementById('tiles-pool');
+  pool.innerHTML = '';
+  [...gapAnswers].sort(()=>Math.random()-0.5).forEach(word => {
+    const t = document.createElement('div');
+    t.className='tile'; t.textContent=word; t.draggable=true; t.dataset.word=word;
+    t.addEventListener('dragstart',e=>{dragWord=word;dragTile=t;t.classList.add('dragging');});
+    t.addEventListener('dragend',()=>t.classList.remove('dragging'));
+    pool.appendChild(t);
+  });
+  let html = gapTemplate.replace(/\n/g,' ');
+  gapAnswers.forEach((_,i) => html=html.replace(`%%${i}%%`,`<span class="gap-drop" id="gap-${i}" data-index="${i}"></span>`));
+  document.getElementById('gap-text-container').innerHTML = html;
+  document.querySelectorAll('.gap-drop').forEach(z => {
+    z.addEventListener('dragover',e=>{e.preventDefault();z.classList.add('drag-over');});
+    z.addEventListener('dragleave',()=>z.classList.remove('drag-over'));
+    z.addEventListener('drop',onDrop);
+    z.addEventListener('click',onZoneClick);
+  });
+}
+
+let dragWord=null, dragTile=null;
+
+function onDrop(e) {
+  e.preventDefault();
+  const z=e.currentTarget; z.classList.remove('drag-over');
+  if (!dragWord) return;
+  if (z.dataset.filled) returnTile(z.dataset.filled);
+  z.textContent=dragWord; z.dataset.filled=dragWord; z.classList.add('filled');
+  z.classList.remove('correct-gap','wrong-gap');
+  if (dragTile) dragTile.classList.add('used');
+  soundDrop();
+  dragWord=null; dragTile=null;
+}
+function onZoneClick(e) {
+  const z=e.currentTarget; if(!z.dataset.filled) return;
+  returnTile(z.dataset.filled); z.textContent=''; delete z.dataset.filled; z.classList.remove('filled','correct-gap','wrong-gap');
+}
+function returnTile(word) {
+  document.querySelectorAll('.tile').forEach(t=>{if(t.dataset.word===word&&t.classList.contains('used'))t.classList.remove('used');});
+}
+
+function checkGap() {
+  let gapScore=0;
+  gapAnswers.forEach((ans,i)=>{
+    const z=document.getElementById(`gap-${i}`);
+    const v=(z.dataset.filled||'').trim();
+    z.classList.remove('correct-gap','wrong-gap');
+    if(v.toLowerCase()===ans.toLowerCase()){z.classList.add('correct-gap');gapScore++;}
+    else z.classList.add('wrong-gap');
+  });
+  const fb=document.getElementById('gap-feedback');
+  fb.textContent=`${gapScore} von ${gapAnswers.length} Lücken korrekt.`;
+  fb.className=gapScore===gapAnswers.length?'feedback ok':'feedback err';
+  setTimeout(()=>showResult(gapScore),1400);
+}
+
+// ── Realistischer Tänzer (Canvas) ─────────────────
+let dancerRaf = null;
+let dancerFrame = 0;
+
+function drawDancer(t) {
+  const canvas = document.getElementById('dancer-canvas');
+  if (!canvas) return;
+  const dc = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  dc.clearRect(0, 0, W, H);
+
+  const cx = W / 2;
+  const base = H - 10;
+
+  // Takt-Rhythmus
+  const beat = Math.sin(t * 0.07);
+  const beat2 = Math.sin(t * 0.07 + Math.PI);
+  const bounce = Math.abs(Math.sin(t * 0.07)) * 4;
+
+  // ── Beine ──
+  const legSwing = Math.sin(t * 0.07) * 28;
+  // Linkes Bein (Oberschenkel)
+  dc.save();
+  dc.translate(cx - 7, base - 38 + bounce);
+  dc.rotate((legSwing * Math.PI) / 180);
+  // Oberschenkel
+  dc.fillStyle = '#8B6914';
+  dc.beginPath();
+  dc.roundRect(-5, 0, 10, 22, 4);
+  dc.fill();
+  // Unterschenkel
+  dc.save();
+  dc.translate(0, 22);
+  dc.rotate((-Math.abs(legSwing) * 0.6 * Math.PI) / 180);
+  dc.fillStyle = '#7a5a10';
+  dc.beginPath();
+  dc.roundRect(-4, 0, 9, 20, 3);
+  dc.fill();
+  // Sandale
+  dc.fillStyle = '#5a3800';
+  dc.beginPath();
+  dc.ellipse(0, 20, 7, 3, 0, 0, Math.PI * 2);
+  dc.fill();
+  dc.restore();
+  dc.restore();
+
+  // Rechtes Bein
+  dc.save();
+  dc.translate(cx + 7, base - 38 + bounce);
+  dc.rotate((-legSwing * Math.PI) / 180);
+  dc.fillStyle = '#8B6914';
+  dc.beginPath();
+  dc.roundRect(-5, 0, 10, 22, 4);
+  dc.fill();
+  dc.save();
+  dc.translate(0, 22);
+  dc.rotate((Math.abs(legSwing) * 0.6 * Math.PI) / 180);
+  dc.fillStyle = '#7a5a10';
+  dc.beginPath();
+  dc.roundRect(-4, 0, 9, 20, 3);
+  dc.fill();
+  dc.fillStyle = '#5a3800';
+  dc.beginPath();
+  dc.ellipse(0, 20, 7, 3, 0, 0, Math.PI * 2);
+  dc.fill();
+  dc.restore();
+  dc.restore();
+
+  // ── Körper / Rüstung ──
+  const bodyY = base - 78 - bounce;
+  // Körperschatten
+  dc.fillStyle = 'rgba(0,0,0,0.18)';
+  dc.beginPath();
+  dc.ellipse(cx, base - 2, 18, 4, 0, 0, Math.PI * 2);
+  dc.fill();
+
+  // Umhang (hinter Körper)
+  const capeSwing = Math.sin(t * 0.05) * 10;
+  dc.save();
+  dc.translate(cx, bodyY + 5);
+  dc.rotate((capeSwing * Math.PI) / 180);
+  const capeG = dc.createLinearGradient(-14, 0, 14, 38);
+  capeG.addColorStop(0, '#c0392b');
+  capeG.addColorStop(1, '#7a1010');
+  dc.fillStyle = capeG;
+  dc.beginPath();
+  dc.moveTo(-12, 0);
+  dc.quadraticCurveTo(-18, 20, -14, 38);
+  dc.lineTo(14, 38);
+  dc.quadraticCurveTo(18, 20, 12, 0);
+  dc.closePath();
+  dc.fill();
+  dc.restore();
+
+  // Rüstung (Torso)
+  const armorG = dc.createLinearGradient(cx - 14, bodyY, cx + 14, bodyY + 34);
+  armorG.addColorStop(0, '#e8c050');
+  armorG.addColorStop(0.5, '#d4af37');
+  armorG.addColorStop(1, '#8b6914');
+  dc.fillStyle = armorG;
+  dc.beginPath();
+  dc.roundRect(cx - 14, bodyY, 28, 34, [4, 4, 2, 2]);
+  dc.fill();
+  dc.strokeStyle = '#5a3e00';
+  dc.lineWidth = 1.2;
+  dc.stroke();
+
+  // Rüstungsdetails (Rippen)
+  dc.strokeStyle = 'rgba(90,60,0,0.4)';
+  dc.lineWidth = 1;
+  for (let i = 1; i < 4; i++) {
+    dc.beginPath();
+    dc.moveTo(cx - 12, bodyY + i * 8);
+    dc.lineTo(cx + 12, bodyY + i * 8);
+    dc.stroke();
+  }
+  // Mittellinie
+  dc.beginPath();
+  dc.moveTo(cx, bodyY + 2);
+  dc.lineTo(cx, bodyY + 32);
+  dc.stroke();
+
+  // Schulterplatten
+  [-1, 1].forEach(side => {
+    const sgx = dc.createLinearGradient(cx + side * 14, bodyY - 4, cx + side * 22, bodyY + 8);
+    sgx.addColorStop(0, '#e8c050');
+    sgx.addColorStop(1, '#8b6914');
+    dc.fillStyle = sgx;
+    dc.beginPath();
+    dc.ellipse(cx + side * 17, bodyY + 2, 7, 5, side * 0.3, 0, Math.PI * 2);
+    dc.fill();
+    dc.strokeStyle = '#5a3e00';
+    dc.lineWidth = 1;
+    dc.stroke();
+  });
+
+  // ── Arme ──
+  const armSwing = Math.sin(t * 0.07) * 45;
+  // Linker Arm (hält Schild)
+  dc.save();
+  dc.translate(cx - 14, bodyY + 6);
+  dc.rotate((-armSwing * Math.PI) / 180);
+  dc.fillStyle = '#c8a030';
+  dc.beginPath();
+  dc.roundRect(-5, 0, 9, 18, 3);
+  dc.fill();
+  // Unterarm
+  dc.save();
+  dc.translate(0, 18);
+  dc.rotate((Math.abs(armSwing) * 0.4 * Math.PI) / 180);
+  dc.fillStyle = '#b89030';
+  dc.beginPath();
+  dc.roundRect(-4, 0, 8, 15, 3);
+  dc.fill();
+  // Schild
+  const shieldG = dc.createRadialGradient(-2, 6, 1, 0, 8, 13);
+  shieldG.addColorStop(0, '#d4af37');
+  shieldG.addColorStop(1, '#5a3e00');
+  dc.fillStyle = shieldG;
+  dc.beginPath();
+  dc.ellipse(-2, 15, 11, 13, 0.2, 0, Math.PI * 2);
+  dc.fill();
+  dc.strokeStyle = '#8b6914';
+  dc.lineWidth = 1.5;
+  dc.stroke();
+  // Schild-Emblem
+  dc.fillStyle = '#c0392b';
+  dc.beginPath();
+  dc.arc(-2, 15, 4, 0, Math.PI * 2);
+  dc.fill();
+  dc.restore();
+  dc.restore();
+
+  // Rechter Arm (hält Speer)
+  dc.save();
+  dc.translate(cx + 14, bodyY + 6);
+  dc.rotate((armSwing * Math.PI) / 180);
+  dc.fillStyle = '#c8a030';
+  dc.beginPath();
+  dc.roundRect(-4, 0, 9, 18, 3);
+  dc.fill();
+  dc.save();
+  dc.translate(0, 18);
+  dc.rotate((-Math.abs(armSwing) * 0.4 * Math.PI) / 180);
+  dc.fillStyle = '#b89030';
+  dc.beginPath();
+  dc.roundRect(-4, 0, 8, 15, 3);
+  dc.fill();
+  // Speer
+  dc.strokeStyle = '#a07820';
+  dc.lineWidth = 2.5;
+  dc.beginPath();
+  dc.moveTo(2, -30);
+  dc.lineTo(2, 40);
+  dc.stroke();
+  // Speerspitze
+  dc.fillStyle = '#aaa';
+  dc.beginPath();
+  dc.moveTo(-1, -30);
+  dc.lineTo(5, -30);
+  dc.lineTo(2, -42);
+  dc.closePath();
+  dc.fill();
+  dc.restore();
+  dc.restore();
+
+  // ── Kopf ──
+  const headY = bodyY - 28;
+  const headTilt = Math.sin(t * 0.09) * 6;
+  dc.save();
+  dc.translate(cx, headY + 12);
+  dc.rotate((headTilt * Math.PI) / 180);
+
+  // Hals
+  dc.fillStyle = '#d4a870';
+  dc.beginPath();
+  dc.roundRect(-5, 0, 10, 14, 2);
+  dc.fill();
+
+  // Gesicht
+  const faceG = dc.createRadialGradient(-2, -10, 2, 0, -8, 14);
+  faceG.addColorStop(0, '#e8c090');
+  faceG.addColorStop(1, '#c8a060');
+  dc.fillStyle = faceG;
+  dc.beginPath();
+  dc.ellipse(0, -10, 12, 14, 0, 0, Math.PI * 2);
+  dc.fill();
+  dc.strokeStyle = '#a07840';
+  dc.lineWidth = 0.8;
+  dc.stroke();
+
+  // Augen
+  [-4, 4].forEach(ex => {
+    dc.fillStyle = '#3a2000';
+    dc.beginPath();
+    dc.ellipse(ex, -12, 2.5, 2, 0, 0, Math.PI * 2);
+    dc.fill();
+    // Glanzpunkt
+    dc.fillStyle = 'rgba(255,255,255,0.6)';
+    dc.beginPath();
+    dc.arc(ex + 0.8, -13, 0.7, 0, Math.PI * 2);
+    dc.fill();
+  });
+
+  // Nase
+  dc.strokeStyle = '#a07840';
+  dc.lineWidth = 1;
+  dc.beginPath();
+  dc.moveTo(0, -10);
+  dc.lineTo(2, -6);
+  dc.lineTo(-1, -6);
+  dc.stroke();
+
+  // Mund (lächelnd)
+  const smileAmt = 0.3 + Math.abs(Math.sin(t * 0.05)) * 0.4;
+  dc.strokeStyle = '#7a4820';
+  dc.lineWidth = 1.2;
+  dc.beginPath();
+  dc.arc(0, -5, 4, smileAmt, Math.PI - smileAmt);
+  dc.stroke();
+
+  // Bart (kurz)
+  dc.fillStyle = '#5a3800';
+  dc.beginPath();
+  dc.ellipse(0, -2, 7, 4, 0, 0, Math.PI);
+  dc.fill();
+
+  // ── Helm ──
+  const helmG = dc.createLinearGradient(-13, -26, 13, -14);
+  helmG.addColorStop(0, '#e8c050');
+  helmG.addColorStop(0.5, '#d4af37');
+  helmG.addColorStop(1, '#8b6914');
+  dc.fillStyle = helmG;
+  dc.beginPath();
+  dc.arc(0, -20, 13, Math.PI, 0);
+  dc.lineTo(13, -14);
+  dc.lineTo(-13, -14);
+  dc.closePath();
+  dc.fill();
+  dc.strokeStyle = '#5a3e00';
+  dc.lineWidth = 1;
+  dc.stroke();
+
+  // Helmwangen
+  [-1, 1].forEach(side => {
+    dc.fillStyle = '#c8a030';
+    dc.beginPath();
+    dc.roundRect(side * 11, -18, side * 3, 12, 1);
+    dc.fill();
+  });
+
+  // Helmkamm (Pferdehaar, wippend)
+  const crestWave = Math.sin(t * 0.1) * 3;
+  dc.fillStyle = '#c0392b';
+  dc.beginPath();
+  dc.moveTo(-3, -32);
+  dc.quadraticCurveTo(0 + crestWave, -50, 3, -32);
+  dc.lineTo(2, -32);
+  dc.quadraticCurveTo(0 + crestWave * 0.5, -46, -2, -32);
+  dc.closePath();
+  dc.fill();
+  // Kammhalter
+  dc.fillStyle = '#8b6914';
+  dc.fillRect(-2, -33, 4, 5);
+
+  dc.restore();
+}
+
+function animateDancer() {
+  dancerFrame++;
+  drawDancer(dancerFrame);
+  dancerRaf = requestAnimationFrame(animateDancer);
+}
+
+function startDancer() {
+  if (dancerRaf) cancelAnimationFrame(dancerRaf);
+  dancerFrame = 0;
+  animateDancer();
+}
+
+// ── Ergebnis ──────────────────────────────────────
+function showResult(gapScore) {
+  const total=score+gapScore, max=quizData.length+gapAnswers.length;
+  const pct=Math.round((total/max)*100);
+  showScreen('screen-result');
+  document.getElementById('result-score').textContent=`${total} / ${max} Punkte (${pct} %)`;
+  let msg='Du hast noch viel zu lernen, Sterblicher.';
+  if(pct>=90) msg='Exzellent! Würdig eines Olympiers.';
+  else if(pct>=70) msg='Beachtlich! Der Ruhm eines Helden ruft dich.';
+  else if(pct>=50) msg='Nicht schlecht – Athena nickt anerkennend.';
+  document.getElementById('result-msg').textContent=msg;
+  startDancer();
+  soundVictory();
+  startFireworks();
+}
+function restartGame() { stopFireworks(); if(dancerRaf){cancelAnimationFrame(dancerRaf);dancerRaf=null;} showScreen('screen-start'); }
+
+// ── Sternschnuppen-Canvas ─────────────────────────
+const canvas=document.getElementById('canvas-bg'), ctx=canvas.getContext('2d');
+function resize(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+window.addEventListener('resize',resize); resize();
+const stars=Array.from({length:120},()=>({x:Math.random()*2000,y:Math.random()*1200,r:Math.random()*1.1+0.2,a:Math.random()*0.7+0.3}));
+const meteors=[],sparks=[];
+function spawnMeteor(){meteors.push({x:Math.random()*canvas.width,y:-10,dx:3+Math.random()*3,dy:1.5+Math.random()*2,len:80+Math.random()*80,life:1});}
+setInterval(spawnMeteor,2200);
+function spawnSparks(){const cx=canvas.width/2,cy=canvas.height/2;for(let i=0;i<20;i++)sparks.push({x:cx,y:cy,dx:(Math.random()-0.5)*5,dy:(Math.random()-0.5)*5,life:1,r:Math.random()*2+1});}
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  stars.forEach(s=>{ctx.beginPath();ctx.arc(s.x%canvas.width,s.y%canvas.height,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(255,245,200,${s.a})`;ctx.fill();});
+  for(let i=meteors.length-1;i>=0;i--){
+    const m=meteors[i];
+    const g=ctx.createLinearGradient(m.x,m.y,m.x-m.dx*m.len/4,m.y-m.dy*m.len/4);
+    g.addColorStop(0,`rgba(255,240,180,${m.life})`);g.addColorStop(1,'rgba(255,240,180,0)');
+    ctx.beginPath();ctx.moveTo(m.x,m.y);ctx.lineTo(m.x-m.dx*m.len/4,m.y-m.dy*m.len/4);
+    ctx.strokeStyle=g;ctx.lineWidth=1.5;ctx.stroke();
+    m.x+=m.dx;m.y+=m.dy;m.life-=0.012;
+    if(m.life<=0||m.x>canvas.width+100||m.y>canvas.height+100)meteors.splice(i,1);
+  }
+  for(let i=sparks.length-1;i>=0;i--){
+    const s=sparks[i];
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.globalAlpha=s.life;ctx.fillStyle='#d4af37';ctx.fill();ctx.globalAlpha=1;
+    s.x+=s.dx;s.y+=s.dy;s.life-=0.04;s.dy+=0.08;if(s.life<=0)sparks.splice(i,1);
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+// ── Parade: Trojanisches Pferd + Soldaten ─────────
+const pCanvas = document.getElementById('parade-canvas');
+const pCtx    = pCanvas.getContext('2d');
+function resizeP(){ pCanvas.width=window.innerWidth; pCanvas.height=window.innerHeight; }
+window.addEventListener('resize', resizeP); resizeP();
+
+let paradeX = -300;
+let paradeRunning = false;
+let paradeRaf;
+const GROUND_Y = () => pCanvas.height - 55;
+
+// Zeichne trojanisches Pferd bei (x, y=Boden)
+function drawHorse(x, y) {
+  const s = 1.5;
+  pCtx.save();
+  pCtx.translate(x, y);
+
+  // Hilfsfunktionen für 3D-Flächen
+  function face(pts, fill, stroke='#3a2800', lw=1.2) {
+    pCtx.beginPath();
+    pCtx.moveTo(pts[0][0], pts[0][1]);
+    pts.slice(1).forEach(p => pCtx.lineTo(p[0], p[1]));
+    pCtx.closePath();
+    pCtx.fillStyle = fill; pCtx.fill();
+    pCtx.strokeStyle = stroke; pCtx.lineWidth = lw; pCtx.stroke();
+  }
+  function grad(x0,y0,x1,y1,c0,c1) {
+    const g = pCtx.createLinearGradient(x0,y0,x1,y1);
+    g.addColorStop(0,c0); g.addColorStop(1,c1); return g;
+  }
+
+  // ── Bodenschatten ──
+  pCtx.fillStyle='rgba(0,0,0,0.22)';
+  pCtx.beginPath(); pCtx.ellipse(0,8*s,44*s,6*s,0,0,Math.PI*2); pCtx.fill();
+
+  // ── RÄDER ──
+  function drawWheel(cx,cy,r){
+    // Tiefe / Seite des Rades
+    const dr = pCtx.createRadialGradient(cx-r*0.3,cy-r*0.3,r*0.1,cx,cy,r);
+    dr.addColorStop(0,'#7a5c10'); dr.addColorStop(1,'#2a1a00');
+    pCtx.beginPath(); pCtx.arc(cx,cy,r,0,Math.PI*2);
+    pCtx.fillStyle=dr; pCtx.fill();
+    pCtx.strokeStyle='#c8960a'; pCtx.lineWidth=2.5; pCtx.stroke();
+    // Speichen
+    for(let a=0;a<8;a++){
+      const ax=Math.cos(a*Math.PI/4)*r, ay=Math.sin(a*Math.PI/4)*r;
+      pCtx.beginPath(); pCtx.moveTo(cx,cy); pCtx.lineTo(cx+ax,cy+ay);
+      pCtx.strokeStyle='#a07820'; pCtx.lineWidth=1.8; pCtx.stroke();
+    }
+    // Felge Highlight
+    pCtx.beginPath(); pCtx.arc(cx,cy,r,Math.PI*1.1,Math.PI*1.7);
+    pCtx.strokeStyle='rgba(255,220,100,0.35)'; pCtx.lineWidth=3; pCtx.stroke();
+    // Nabe
+    const ng=pCtx.createRadialGradient(cx-1,cy-1,0.5,cx,cy,r*0.22);
+    ng.addColorStop(0,'#ffe090'); ng.addColorStop(1,'#a07820');
+    pCtx.beginPath(); pCtx.arc(cx,cy,r*0.22,0,Math.PI*2);
+    pCtx.fillStyle=ng; pCtx.fill();
+    pCtx.strokeStyle='#5a3e00'; pCtx.lineWidth=1.2; pCtx.stroke();
+  }
+  drawWheel(-26*s, 4*s, 11*s);
+  drawWheel( 26*s, 4*s, 11*s);
+
+  // Achse
+  const axG = grad(-26*s,0,26*s,0,'#c8960a','#5a3e00');
+  pCtx.beginPath(); pCtx.moveTo(-26*s,4*s); pCtx.lineTo(26*s,4*s);
+  pCtx.strokeStyle=axG; pCtx.lineWidth=5*s*0.5; pCtx.stroke();
+
+  // ── PLATTFORM (Unterseite 3D) ──
+  // Seite unten (dunkler)
+  face([[-32*s,2*s],[32*s,2*s],[32*s,8*s],[-32*s,8*s]], '#7a5010');
+  // Vorderseite Plattform
+  const pfG = grad(-32*s,-6*s,32*s,2*s,'#d4a030','#8a6010');
+  face([[-32*s,-6*s],[32*s,-6*s],[32*s,2*s],[-32*s,2*s]], pfG);
+  // Bretterstruktur
+  pCtx.strokeStyle='rgba(50,30,0,0.35)'; pCtx.lineWidth=1;
+  for(let i=-28;i<32;i+=9){
+    pCtx.beginPath(); pCtx.moveTo(i*s,-6*s); pCtx.lineTo(i*s,2*s); pCtx.stroke();
+  }
+  // Highlight oben
+  pCtx.beginPath(); pCtx.moveTo(-32*s,-6*s); pCtx.lineTo(32*s,-6*s);
+  pCtx.strokeStyle='rgba(255,220,100,0.4)'; pCtx.lineWidth=1.5; pCtx.stroke();
+  // Nieten
+  pCtx.fillStyle='#d4af37';
+  [-24,-12,0,12,24].forEach(nx=>{
+    pCtx.beginPath(); pCtx.arc(nx*s,-1*s,2*s,0,Math.PI*2); pCtx.fill();
+    pCtx.strokeStyle='#7a5c10'; pCtx.lineWidth=0.8; pCtx.stroke();
+  });
+
+  // ── RUMPF / KÖRPER (3D-Box) ──
+  // Rechte Seite (dunkler)
+  face([[22*s,-6*s],[28*s,-10*s],[28*s,-30*s],[22*s,-26*s]],
+    grad(22*s,0,28*s,0,'#9a7015','#6a4a0a'));
+  // Oberseite
+  face([[-22*s,-30*s],[22*s,-30*s],[28*s,-34*s],[-16*s,-34*s]],
+    grad(0,-34*s,0,-30*s,'#e8c050','#b8900a'));
+  // Vorderfläche (Front)
+  const bodyG = grad(-22*s,-26*s,22*s,-6*s,'#d4a030','#9a7015');
+  face([[-22*s,-26*s],[22*s,-26*s],[22*s,-6*s],[-22*s,-6*s]], bodyG);
+  // Holzbretter
+  pCtx.strokeStyle='rgba(50,30,0,0.3)'; pCtx.lineWidth=1;
+  for(let i=-18;i<22;i+=9){
+    pCtx.beginPath(); pCtx.moveTo(i*s,-26*s); pCtx.lineTo(i*s,-6*s); pCtx.stroke();
+  }
+  // Rahmen
+  pCtx.strokeStyle='#5a3e00'; pCtx.lineWidth=2;
+  pCtx.strokeRect(-22*s,-26*s,44*s,20*s);
+  // Highlight Kante
+  pCtx.beginPath(); pCtx.moveTo(-22*s,-26*s); pCtx.lineTo(22*s,-26*s);
+  pCtx.strokeStyle='rgba(255,220,100,0.5)'; pCtx.lineWidth=1.5; pCtx.stroke();
+
+  // ── GEHEIMTÜR ──
+  const doorG = grad(-7*s,-26*s,-7*s,-14*s,'#9a6010','#5a3800');
+  face([[-7*s,-25*s],[7*s,-25*s],[7*s,-14*s],[-7*s,-14*s]], doorG, '#3a2000', 1.5);
+  // Türrahmen Highlight
+  pCtx.beginPath(); pCtx.moveTo(-7*s,-25*s); pCtx.lineTo(7*s,-25*s);
+  pCtx.strokeStyle='rgba(200,140,30,0.5)'; pCtx.lineWidth=1; pCtx.stroke();
+  // Türknopf 3D
+  const knG=pCtx.createRadialGradient(6*s,-19.5*s,0.3,6*s,-19.5*s,2*s);
+  knG.addColorStop(0,'#ffe090'); knG.addColorStop(1,'#a07820');
+  pCtx.beginPath(); pCtx.arc(6*s,-19.5*s,2*s,0,Math.PI*2);
+  pCtx.fillStyle=knG; pCtx.fill();
+
+  // ── HALS ──
+  // Seite
+  face([[20*s,-24*s],[26*s,-28*s],[30*s,-50*s],[24*s,-46*s]],
+    grad(20*s,0,26*s,0,'#9a7015','#6a4a0a'));
+  // Front
+  const neckG = grad(16*s,-24*s,24*s,-46*s,'#c49a30','#9a7015');
+  face([[16*s,-24*s],[22*s,-24*s],[26*s,-46*s],[20*s,-46*s]], neckG);
+  pCtx.strokeStyle='rgba(50,30,0,0.25)'; pCtx.lineWidth=0.8;
+  pCtx.beginPath(); pCtx.moveTo(18*s,-26*s); pCtx.lineTo(22*s,-46*s); pCtx.stroke();
+
+  // ── KOPF ──
+  // Hinterkopf/Tiefe
+  face([[20*s,-46*s],[34*s,-46*s],[38*s,-50*s],[24*s,-50*s]],
+    grad(0,-50*s,0,-46*s,'#9a7015','#7a5010'));
+  // Kopfseite rechts
+  face([[34*s,-46*s],[40*s,-52*s],[38*s,-62*s],[32*s,-56*s]],
+    grad(34*s,0,40*s,0,'#9a7015','#6a4a0a'));
+  // Kopffront
+  const headG = grad(20*s,-62*s,40*s,-46*s,'#d4a838','#9a7015');
+  face([[20*s,-46*s],[34*s,-46*s],[38*s,-62*s],[24*s,-62*s]], headG);
+  // Stirn-Highlight
+  pCtx.beginPath(); pCtx.moveTo(22*s,-62*s); pCtx.lineTo(36*s,-62*s);
+  pCtx.strokeStyle='rgba(255,220,100,0.45)'; pCtx.lineWidth=1.2; pCtx.stroke();
+  // Schnauze 3D
+  const snoutG = grad(34*s,-56*s,42*s,-50*s,'#c49a30','#8a6010');
+  face([[34*s,-56*s],[42*s,-54*s],[42*s,-48*s],[34*s,-50*s]], snoutG);
+  // Nüster
+  pCtx.fillStyle='#3a2000';
+  pCtx.beginPath(); pCtx.ellipse(40*s,-50*s,2*s,1.5*s,0.2,0,Math.PI*2); pCtx.fill();
+  // Auge 3D
+  const eyeG=pCtx.createRadialGradient(26*s,-58*s,0.5,27*s,-58*s,3*s);
+  eyeG.addColorStop(0,'#ffe090'); eyeG.addColorStop(0.4,'#7a5010'); eyeG.addColorStop(1,'#1a0a00');
+  pCtx.beginPath(); pCtx.ellipse(27*s,-58*s,3*s,2.5*s,0.1,0,Math.PI*2);
+  pCtx.fillStyle=eyeG; pCtx.fill();
+  pCtx.strokeStyle='#3a2000'; pCtx.lineWidth=0.8; pCtx.stroke();
+  // Pupille
+  pCtx.fillStyle='#0a0500';
+  pCtx.beginPath(); pCtx.ellipse(27.5*s,-58*s,1.2*s,1.5*s,0.1,0,Math.PI*2); pCtx.fill();
+  // Ohr 3D
+  face([[22*s,-62*s],[26*s,-62*s],[24*s,-70*s],[20*s,-68*s]],
+    grad(22*s,-70*s,26*s,-62*s,'#c49a30','#8a6010'));
+
+  // ── MÄHNE (Holzschnitzerei, gezackt, 3D) ──
+  for(let i=0;i<5;i++){
+    const bx=(20+i*2.5)*s, by=(-46-i*3)*s;
+    face([[bx-3*s,by+4*s],[bx+3*s,by+4*s],[bx+1*s,by-5*s],[bx-1*s,by-5*s]],
+      grad(bx,by+4*s,bx,by-5*s,'#c0392b','#7a1010'));
+    // Schattenseite
+    face([[bx+3*s,by+4*s],[bx+5*s,by+2*s],[bx+3*s,by-5*s],[bx+1*s,by-5*s]],
+      '#7a1010');
+  }
+
+  // ── SCHWEIF ──
+  pCtx.lineCap='round';
+  [4,2.5,1.5].forEach((lw,i)=>{
+    pCtx.beginPath();
+    pCtx.moveTo(-26*s,-10*s);
+    pCtx.bezierCurveTo(-44*s+i*2,(-2+i*2)*s,-50*s+i,14*s,(-42+i*3)*s,20*s);
+    pCtx.strokeStyle=i===0?'#8B1a1a':i===1?'#a02020':'#c03030';
+    pCtx.lineWidth=lw*s*0.6; pCtx.stroke();
+  });
+
+  // ── FAHNENMAST ──
+  const mastG=grad(0,-6*s,3*s,-6*s,'#c8960a','#5a3e00');
+  pCtx.beginPath(); pCtx.moveTo(1.5*s,-26*s); pCtx.lineTo(1.5*s,-58*s);
+  pCtx.strokeStyle=mastG; pCtx.lineWidth=3; pCtx.stroke();
+  // Fahne mit Wehen
+  const t=paradeFrame*0.08;
+  pCtx.beginPath();
+  pCtx.moveTo(1.5*s,-58*s);
+  pCtx.bezierCurveTo(8*s+Math.sin(t)*3,-53*s,14*s+Math.sin(t+1)*3,-51*s,12*s+Math.sin(t+2)*2,-46*s);
+  pCtx.lineTo(1.5*s,-50*s);
+  pCtx.closePath();
+  const flagG=grad(1.5*s,-58*s,14*s,-46*s,'#e03020','#8B1010');
+  pCtx.fillStyle=flagG; pCtx.fill();
+
+  pCtx.restore();
+}
+
+// Zeichne kleinen Soldaten
+function drawSoldier(x, y, frame) {
+  pCtx.save();
+  pCtx.translate(x, y);
+  const bob = Math.sin(frame * 0.3) * 2; // Gehbewegung
+  // Beine
+  pCtx.fillStyle = '#8B6914';
+  const lLeg = Math.sin(frame*0.3)*6;
+  pCtx.fillRect(-4, bob, 4, 14+lLeg);
+  pCtx.fillRect(1,  bob, 4, 14-lLeg);
+  // Körper / Rüstung
+  pCtx.fillStyle = '#d4af37';
+  pCtx.fillRect(-5, -14+bob, 10, 14);
+  // Umhang
+  pCtx.fillStyle = '#c0392b';
+  pCtx.beginPath();
+  pCtx.moveTo(-5,-14+bob); pCtx.lineTo(-9,2+bob); pCtx.lineTo(-5,2+bob);
+  pCtx.closePath(); pCtx.fill();
+  // Kopf
+  pCtx.fillStyle = '#f0e8c8';
+  pCtx.beginPath(); pCtx.arc(0, -19+bob, 5, 0, Math.PI*2); pCtx.fill();
+  // Helm
+  pCtx.fillStyle = '#a07820';
+  pCtx.beginPath();
+  pCtx.arc(0, -21+bob, 5, Math.PI, 0); pCtx.fill();
+  // Helmkamm
+  pCtx.fillStyle = '#c0392b';
+  pCtx.fillRect(-1, -27+bob, 2, 7);
+  // Schild
+  pCtx.fillStyle = '#8B6914';
+  pCtx.beginPath();
+  pCtx.ellipse(-8, -8+bob, 4, 6, 0.2, 0, Math.PI*2); pCtx.fill();
+  // Speer
+  pCtx.strokeStyle = '#a07820'; pCtx.lineWidth = 1.5;
+  pCtx.beginPath(); pCtx.moveTo(6,-26+bob); pCtx.lineTo(6,10+bob); pCtx.stroke();
+  pCtx.fillStyle='#888';
+  pCtx.beginPath(); pCtx.moveTo(4,-26+bob); pCtx.lineTo(8,-26+bob); pCtx.lineTo(6,-32+bob); pCtx.closePath(); pCtx.fill();
+  pCtx.restore();
+}
+
+let paradeFrame = 0;
+function drawParade() {
+  if (!paradeRunning) return;
+  pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+
+  const gy = GROUND_Y();
+  paradeX += 1.1; // Geschwindigkeit
+  paradeFrame++;
+
+  // Pferd
+  drawHorse(paradeX, gy - 26);
+
+  // Soldaten hinter dem Pferd (5 Stück mit Abstand)
+  const soldierOffsets = [-60,-100,-140,-180,-220];
+  soldierOffsets.forEach((off, i) => {
+    drawSoldier(paradeX + off, gy - 2, paradeFrame + i*8);
+  });
+
+  // Soldaten vor dem Pferd (2 Anführer)
+  [60, 95].forEach((off, i) => {
+    drawSoldier(paradeX + off, gy - 2, paradeFrame + i*5);
+  });
+
+  // Wenn Prozession aus dem Bild ist → stoppen
+  if (paradeX > pCanvas.width + 300) {
+    paradeRunning = false;
+    pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+    return;
+  }
+  paradeRaf = requestAnimationFrame(drawParade);
+}
+
+function startParade() {
+  if (paradeRunning) {
+    cancelAnimationFrame(paradeRaf);
+    pCtx.clearRect(0,0,pCanvas.width,pCanvas.height);
+  }
+  paradeX = -300;
+  paradeFrame = 0;
+  paradeRunning = true;
+  drawParade();
+}
+const fwCanvas=document.getElementById('fireworks-canvas'),fwCtx=fwCanvas.getContext('2d');
+let fwRunning=false,fwParticles=[],fwRaf,fwInterval;
+function resizeFW(){fwCanvas.width=window.innerWidth;fwCanvas.height=window.innerHeight;}
+window.addEventListener('resize',resizeFW);resizeFW();
+const FW_COLORS=['#d4af37','#f0e8c8','#c0392b','#e67e22','#8e44ad','#2980b9','#27ae60','#f39c12','#fff','#e74c3c'];
+function launchRocket(){
+  const x=Math.random()*fwCanvas.width,y=fwCanvas.height*(0.2+Math.random()*0.45);
+  const color=FW_COLORS[Math.floor(Math.random()*FW_COLORS.length)],count=60+Math.floor(Math.random()*50);
+  for(let i=0;i<count;i++){
+    const angle=(Math.PI*2/count)*i,speed=2+Math.random()*4;
+    fwParticles.push({x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:1,decay:0.012+Math.random()*0.01,r:1.5+Math.random()*2,color});
+  }
+}
+function drawFW(){
+  if(!fwRunning)return;
+  fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);
+  for(let i=fwParticles.length-1;i>=0;i--){
+    const p=fwParticles[i];
+    fwCtx.beginPath();fwCtx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    fwCtx.globalAlpha=p.life;fwCtx.fillStyle=p.color;fwCtx.fill();fwCtx.globalAlpha=1;
+    p.x+=p.vx;p.y+=p.vy;p.vy+=0.06;p.vx*=0.98;p.life-=p.decay;if(p.life<=0)fwParticles.splice(i,1);
+  }
+  fwRaf=requestAnimationFrame(drawFW);
+}
+function startFireworks(){fwRunning=true;fwParticles=[];launchRocket();soundFirework();fwInterval=setInterval(()=>{launchRocket();soundFirework();},700);drawFW();}
+function stopFireworks(){fwRunning=false;clearInterval(fwInterval);fwParticles=[];cancelAnimationFrame(fwRaf);fwCtx.clearRect(0,0,fwCanvas.width,fwCanvas.height);}
+</script>
+</body>
+</html>
